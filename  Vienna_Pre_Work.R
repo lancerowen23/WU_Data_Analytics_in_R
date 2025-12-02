@@ -43,4 +43,15 @@ df %>%
   scale_y_continuous(labels = percent_format()) +
   labs(title = "Churn Proportion by Contract Type")
 
+### Inspect Missing Data
+colSums(is.na(df))
+
+# Get tallys for character and categorical columns
+tally_cols <- names(df)[sapply(df, is.character)]
+
+for (col in tally_cols) {
+  cat("------------\n")
+  cat("Column:", col, "\n")
+  print(table(df[[col]], useNA = "ifany"))
+}
 
