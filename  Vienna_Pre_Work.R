@@ -6,6 +6,7 @@
 library(ggplot2)
 library(dplyr)
 library(tidyverse)
+library(caret)
 
 # Import data
 df <- read.csv('https://raw.githubusercontent.com/kwartler/teaching-datasets/refs/heads/main/WA_Fn-UseC_-Telco-Customer-Churn.csv')
@@ -37,7 +38,7 @@ summary(df_num)
 df_num %>%
   pivot_longer(cols = everything(), names_to = "variable", values_to = "value") %>%
   ggplot(aes(x = value)) +
-  geom_histogram(bins = 30, fill = "skyblue", color = "darkgrey") +
+  geom_histogram(bins = 30, fill = "#b0e0e6", color = "darkgrey") +
   facet_wrap(~variable, scales = "free") +
   theme_minimal() +
   labs(title = "Histograms of Tenure, Monthly Charges, and Total Charges")
@@ -48,7 +49,7 @@ num_long <- df_num %>%
                names_to = "variable",
                values_to = "value")
 ggplot(num_long, aes(x = "", y = value)) +  # x="" to create a single box per variable
-  geom_boxplot(fill = "lightblue", color = "darkgrey", outlier.color = "orange", outlier.shape = 8) +
+  geom_boxplot(fill = "#b0e0e6", color = "darkgrey", outlier.color = "#FCC981", outlier.shape = 8) +
   facet_wrap(~variable, scales = "free") +  # one boxplot per variable
   theme_minimal() +
   labs(title = "Boxplots of Tenure, Monthly Charges, and Total Charges",
@@ -56,14 +57,12 @@ ggplot(num_long, aes(x = "", y = value)) +  # x="" to create a single box per va
        y = "Value")
 #from this, I don't really see any outliers in numerical values
 
-# Get tallys for character and categorical columns
-tally_cols <- names(df)[sapply(df, is.character)]
-
-for (col in tally_cols) {
-  cat("------------\n")
-  cat("Column:", col, "\n")
-  print(table(df[[col]], useNA = "ifany"))
-}
+#convert character columns (except customerID) to factors
+df <- df %>%
+  mutate(across(where(is.character) & !customerID, as.factor))
+#check
+str(df)
+summary(df[, sapply(df, is.factor)])
 
 #quick correlation plots for numeric columns
 df %>% select(tenure, MonthlyCharges, TotalCharges) %>% pairs()
@@ -111,5 +110,46 @@ df %>%
   scale_fill_manual(values = c("#017075","#F48D79"))+
   scale_y_continuous(labels = percent_format()) +
   labs(title = "Churn Proportion by Contract Type")
+
+str(df)
+View(df)
+
+
+### MODELING
+
+# I.Logistic Regression
+
+#define variables
+informativeFeatures <- colnames(df)[2:20] #removes CustomerID
+targetVariable      <- colnames(df)[21] #churn!
+successClass        <- 'Yes' #looking for what leads to a churn (departing customer)
+
+#partition data
+splitPercent <- round(nrow(df) %*% .9)
+totalRecords <- 1:nrow(df)
+set.seed(1234)
+df_part <- sample(totalRecords, splitPercent)
+trainDat <- df[df_part,]
+testDat  <- df[-df_part,]
+
+ctrl <- trainControl(
+  method = "cv",
+  number = 10,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary,
+  savePredictions = "final"
+)
+
+set.seed(123)
+model_logit <- train(
+  Churn ~ ., 
+  data = trainDat,
+  method = "glm",
+  family = "binomial",
+  trControl = ctrl,
+  metric = "ROC"
+)
+
+print(model_logit)
 
 
