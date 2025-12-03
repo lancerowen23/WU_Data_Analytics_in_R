@@ -1,14 +1,20 @@
-### Vienna Module (Data Analytics in R) Pre-Work
+### Vienna Module ("Data Analytics in R") Pre-Work
 ### Author: Lance Owen
 ### Date: 2 December 2025
 ### Track: Advanced
+
+### LOAD LIBRARIES AND IMPORT DATA
 
 library(ggplot2)
 library(dplyr)
 library(tidyverse)
 library(caret)
+library(vtreat)
+library(MLmetrics)
+library(rpart.plot)
+library(randomForest)
+library(pROC)
 
-# Import data
 df <- read.csv('https://raw.githubusercontent.com/kwartler/teaching-datasets/refs/heads/main/WA_Fn-UseC_-Telco-Customer-Churn.csv')
 
 ### QUICK INITAL REVIEW OF OF STRUCTURE, DATA TYPES, ETC.
@@ -48,6 +54,7 @@ num_long <- df_num %>%
   pivot_longer(cols = everything(),
                names_to = "variable",
                values_to = "value")
+
 ggplot(num_long, aes(x = "", y = value)) +  # x="" to create a single box per variable
   geom_boxplot(fill = "#b0e0e6", color = "darkgrey", outlier.color = "#FCC981", outlier.shape = 8) +
   facet_wrap(~variable, scales = "free") +  # one boxplot per variable
@@ -72,9 +79,6 @@ GGally::ggpairs(df_corr %>% sample_n(min(750, nrow(df_corr))),
                 mapping = aes(alpha = 0.4))
 
 # Inspect distribution of churn (our dependent variable)
-ggplot(df, aes(x = Churn)) +
-  geom_bar() + labs(title = "Churn distribution in Raw Data")
-
 ggplot(df, aes(x = Churn, fill = Churn)) +
   geom_bar(color = "darkgrey", width = 0.6) +        
   scale_fill_manual(values = c("#017075","#F48D79")) + 
@@ -99,6 +103,8 @@ ggplot(df, aes(x = tenure, color = Churn, fill = Churn)) +
 # View Boxplots for Monthly Charges by Churn
 ggplot(df, aes(x = Churn, y = MonthlyCharges)) +
   geom_boxplot() + labs(title = "Monthly Charges by Churn")
+# So seems that low tenure (ie new-ish and short-term customers) churn more, as
+# do customers who have higher monthly charges
 
 # Look at Contract Type vs Churn in %
 df %>%
@@ -108,48 +114,154 @@ df %>%
   ggplot(aes(x = Contract, y = pct, fill = Churn)) +
   geom_col(position = "dodge") +
   scale_fill_manual(values = c("#017075","#F48D79"))+
-  scale_y_continuous(labels = percent_format()) +
   labs(title = "Churn Proportion by Contract Type")
+# Seems that month-to-month contracts result in higher churn rate than 
+# longer-term contracts
 
 str(df)
 View(df)
 
+#partition data for models
+df_model <- df %>% select(-customerID)
+set.seed(123)
+trainIndex <- createDataPartition(df_model$Churn, p = 0.7, list = FALSE)
+trainDat <- df_model[trainIndex, ]
+testDat  <- df_model[-trainIndex, ]
 
-### MODELING
+
+### MODELING (3 TYPES)
 
 # I.Logistic Regression
 
 #define variables
-informativeFeatures <- colnames(df)[2:20] #removes CustomerID
-targetVariable      <- colnames(df)[21] #churn!
-successClass        <- 'Yes' #looking for what leads to a churn (departing customer)
+informativeVars <- colnames(df_model)[1:19]
+targetVar <- colnames(df_model)[20] 
+successClass <- 'Yes' 
 
-#partition data
-splitPercent <- round(nrow(df) %*% .9)
-totalRecords <- 1:nrow(df)
-set.seed(1234)
-df_part <- sample(totalRecords, splitPercent)
-trainDat <- df[df_part,]
-testDat  <- df[-df_part,]
+# Design "C"ategorical variable plan
+plan <- designTreatmentsC(trainDat,
+                          informativeVars,
+                          targetVar, "Yes")
 
-ctrl <- trainControl(
-  method = "cv",
-  number = 10,
-  classProbs = TRUE,
-  summaryFunction = twoClassSummary,
-  savePredictions = "final"
-)
+# Apply to informative variables
+treatedX <- prepare(plan, trainDat)
+
+# Fit a logistic regression model
+fit <- glm(Churn ~., data = treatedX, family ='binomial')
+summary(fit)
+
+# Backward Variable selection to reduce chances of multi-colinearity
+bestFit <- step(fit, direction='backward')
+summary(bestFit)
+
+# Model shows better fit and only 15 (of 66) predictors. 
+length(coefficients(fit))
+length(coefficients(bestFit))
+
+# Get predictions
+treatedTest <- prepare(plan, testDat)
+churnPred <- predict(bestFit, treatedTest, type = 'response')
+head(churnPred)
+
+# Classify and get confusion matrix
+cutoff <- 0.5
+churnClasses <- ifelse(churnPred >= cutoff, "Yes", "No")
+churnClasses <- factor(churnClasses, levels = c("No", "Yes"))
+actualChurn <- factor(testDat$Churn, levels = c("No", "Yes"))
+confMat <- confusionMatrix(churnClasses, actualChurn)
+confMat
+
+logit_roc <- roc(ifelse(testDat$Churn == "Yes", 1, 0), logit_probs)
+
+
+# II. Decision Tree
+
+dec_tree <- rpart(Churn ~ ., data = trainDat, method = "class", 
+                 minsplit = 1, minbucket = 1, cp=-1, control = rpart.control(cp = 0.01))
+rpart.plot(dec_tree, type = 3, extra = 104, fallen.leaves = TRUE, cex = 0.6)
+
+# Look at training probabilities
+trainProbs <- predict(dec_tree, trainDat) 
+head(trainProbs, 10)
+
+# Get the final class and actuals
+trainClass <- data.frame(class = colnames(trainProbs)[max.col(trainProbs)],
+                         actual = trainDat$Churn)
+head(trainClass, 10)
+
+# Confusion Matrix
+confMat <- table(trainClass$class,trainClass$actual)
+confMat
+
+# Accuracy
+sum(diag(confMat))/sum(confMat)
+
+# Now predict on the test set
+testProbs <- predict(dec_tree, testDat)
+
+# Get the final class and actuals
+testClass<-data.frame(class  = colnames(testProbs)[max.col(testProbs)],
+                      actual = testDat$Churn)
+
+# Confusion Matrix
+confMat <- table(testClass$class,testClass$actual)
+confMat
+
+# Accuracy
+sum(diag(confMat))/sum(confMat)
+
+dt_roc <- roc(ifelse(testDat$Churn == "Yes", 1, 0), tree_probs)
+
+
+# III. Random Forest
 
 set.seed(123)
-model_logit <- train(
-  Churn ~ ., 
-  data = trainDat,
-  method = "glm",
-  family = "binomial",
-  trControl = ctrl,
-  metric = "ROC"
-)
+rf <- randomForest(Churn ~ ., data = trainDat, ntree = 500,
+                         mtry = floor(sqrt(ncol(train)-1)), importance = TRUE,
+                         proximity = TRUE)
 
-print(model_logit)
+print(rf)
+
+# Variable importance plot
+varImpPlot(rf, main="Random Forest // Variable Importance")
+
+
+# Predict on test set
+pred_probs <- predict(rf, testDat, type = "prob")[, "Yes"]  # probabilities for "Yes"
+pred_class <- predict(rf, testDat, type = "class")          # predicted class labels
+
+# Confusion matrix
+confMat <- confusionMatrix(pred_class, testDat$Churn)
+print(confMat)
+
+# ROC curve and AUC
+actual <- ifelse(testDat$Churn == "Yes", 1, 0)
+roc_obj <- roc(actual, pred_probs)
+plot(roc_obj, main = "ROC Curve - Random Forest", col = "darkgreen", lwd = 2)
+auc_val <- auc(roc_obj)
+cat("AUC:", round(auc_val,3), "\n")
+
+rf_roc <- roc(ifelse(testDat$Churn == "Yes", 1, 0), rf_probs)
+
+# Tune Random Forest with caret
+rf_grid <- expand.grid(mtry = c(3, 5, 7, 10))
+set.seed(123)
+rf_caret <- train(Churn ~ ., data = trainDat, method = "rf",
+                  tuneGrid = rf_grid,
+                  ntree = 500,
+                  trControl = trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary),
+                  metric = "ROC")
+
+print(rf_caret)
+
+
+# Comparing the three ROC curves
+plot(logit_roc, col = "#017075", lwd = 2, main = "ROC Curve Comparison")
+plot(dt_roc, col = "#F48D79", lwd = 2, add = TRUE)
+plot(rf_roc, col = "#FCC981", lwd = 2, add = TRUE)
+legend("bottomright", legend = c("Logistic", "Decision Tree", "Random Forest"),
+       col = c("#017075", "#F48D79", "#FCC981"), lwd = 2)
+
+
 
 
