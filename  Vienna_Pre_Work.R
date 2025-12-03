@@ -14,6 +14,7 @@ library(MLmetrics)
 library(rpart.plot)
 library(randomForest)
 library(pROC)
+library(gbm)
 
 df <- read.csv('https://raw.githubusercontent.com/kwartler/teaching-datasets/refs/heads/main/WA_Fn-UseC_-Telco-Customer-Churn.csv')
 
@@ -219,16 +220,14 @@ set.seed(123)
 rf <- randomForest(Churn ~ ., data = trainDat, ntree = 500,
                          mtry = floor(sqrt(ncol(train)-1)), importance = TRUE,
                          proximity = TRUE)
-
 print(rf)
 
 # Variable importance plot
 varImpPlot(rf, main="Random Forest // Variable Importance")
 
-
 # Predict on test set
-rf_probs <- predict(rf, testDat, type = "prob")[, "Yes"]  # probabilities for "Yes"
-rf_class <- predict(rf, testDat, type = "class")          # predicted class labels
+rf_probs <- predict(rf, testDat, type = "prob")[, "Yes"] 
+rf_class <- predict(rf, testDat, type = "class")
 
 # Confusion matrix
 confMat <- confusionMatrix(rf_class, testDat$Churn)
@@ -237,13 +236,12 @@ print(confMat)
 # ROC curve and AUC
 actual <- ifelse(testDat$Churn == "Yes", 1, 0)
 roc_obj <- roc(actual, pred_probs)
-plot(roc_obj, main = "ROC Curve - Random Forest", col = "darkgreen", lwd = 2)
 auc_val <- auc(roc_obj)
 cat("AUC:", round(auc_val,3), "\n")
 
 rf_roc <- roc(ifelse(testDat$Churn == "Yes", 1, 0), rf_probs)
 
-# Tune Random Forest with caret
+# Try and Tune Random Forest with caret
 rf_grid <- expand.grid(mtry = c(3, 5, 7, 10))
 set.seed(123)
 rf_caret <- train(Churn ~ ., data = trainDat, method = "rf",
@@ -251,7 +249,6 @@ rf_caret <- train(Churn ~ ., data = trainDat, method = "rf",
                   ntree = 500,
                   trControl = trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary),
                   metric = "ROC")
-
 print(rf_caret)
 
 # Predict on test set
@@ -262,16 +259,50 @@ rf_class2 <- predict(rf_caret, testDat, type = "raw")
 confMat2 <- confusionMatrix(pred_class2, testDat$Churn)
 print(confMat2)
 
+# roc
 rf2_roc <- roc(ifelse(testDat$Churn == "Yes", 1, 0), rf_probs2)
 
-# Comparing the four ROC curves
+# Comparing the four ROC curves in a plot
 plot(logit_roc, col = "#017075", lwd = 2, main = "ROC Curve Comparison")
 plot(dt_roc, col = "#F48D79", lwd = 2, add = TRUE)
 plot(rf_roc, col = "#FCC981", lwd = 2, add = TRUE)
-plot(rf2_roc, col = "orange", lwd = 2, add = TRUE)
-legend("bottomright", legend = c("Logistic", "Decision Tree", "Random Forest"),
-       col = c("#017075", "#F48D79", "#FCC981", "orange""), lwd = 2)
+plot(rf2_roc, col = "navy", lwd = 2, add = TRUE)
+legend("bottomright", legend = c("Logistic", "Decision Tree", "Random Forest", "Random Forest Tuned"),
+       col = c("#017075", "#F48D79", "#FCC981", "navy"), lwd = 2)
 
 
+# Compare 
+
+ctrl <- trainControl(
+  method = "cv",
+  number = 5,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary,
+  savePredictions = "final"
+)
+
+fit_logit <- train(Churn ~ ., data = trainDat, 
+                   method = "glm", trControl = ctrl, metric = "ROC")
+
+fit_gbm <- train(Churn ~ ., data = trainDat, 
+                 method = "gbm", trControl = ctrl, metric = "ROC")
+
+fit_rf <- train(Churn ~ ., data = trainDat, 
+                method = "rf", trControl = ctrl, metric = "ROC")
+
+models <- resamples(list(
+  Logit = fit_logit,
+  GBM = fit_gbm,
+  RF = fit_rf
+))
+
+#See comparisons
+summary(models)
+bwplot(models, metric = "ROC")
+dotplot(models, metric = "ROC")
+
+#Are ROC differences statistically significant?
+differences <- diff(models)
+summary(differences)
 
 
