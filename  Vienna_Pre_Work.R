@@ -129,7 +129,7 @@ trainDat <- df_model[trainIndex, ]
 testDat  <- df_model[-trainIndex, ]
 
 
-### MODELING (3 TYPES)
+### MODELING (3 TYPES: logistic regression, decision tree, random forest)
 
 # I.Logistic Regression
 
@@ -227,11 +227,11 @@ varImpPlot(rf, main="Random Forest // Variable Importance")
 
 
 # Predict on test set
-pred_probs <- predict(rf, testDat, type = "prob")[, "Yes"]  # probabilities for "Yes"
-pred_class <- predict(rf, testDat, type = "class")          # predicted class labels
+rf_probs <- predict(rf, testDat, type = "prob")[, "Yes"]  # probabilities for "Yes"
+rf_class <- predict(rf, testDat, type = "class")          # predicted class labels
 
 # Confusion matrix
-confMat <- confusionMatrix(pred_class, testDat$Churn)
+confMat <- confusionMatrix(rf_class, testDat$Churn)
 print(confMat)
 
 # ROC curve and AUC
@@ -254,13 +254,23 @@ rf_caret <- train(Churn ~ ., data = trainDat, method = "rf",
 
 print(rf_caret)
 
+# Predict on test set
+rf_probs2 <- predict(rf_caret, testDat, type = "prob")[, "Yes"]  # probabilities for "Yes"
+rf_class2 <- predict(rf_caret, testDat, type = "raw")
 
-# Comparing the three ROC curves
+# Confusion matrix
+confMat2 <- confusionMatrix(pred_class2, testDat$Churn)
+print(confMat2)
+
+rf2_roc <- roc(ifelse(testDat$Churn == "Yes", 1, 0), rf_probs2)
+
+# Comparing the four ROC curves
 plot(logit_roc, col = "#017075", lwd = 2, main = "ROC Curve Comparison")
 plot(dt_roc, col = "#F48D79", lwd = 2, add = TRUE)
 plot(rf_roc, col = "#FCC981", lwd = 2, add = TRUE)
+plot(rf2_roc, col = "orange", lwd = 2, add = TRUE)
 legend("bottomright", legend = c("Logistic", "Decision Tree", "Random Forest"),
-       col = c("#017075", "#F48D79", "#FCC981"), lwd = 2)
+       col = c("#017075", "#F48D79", "#FCC981", "orange""), lwd = 2)
 
 
 
