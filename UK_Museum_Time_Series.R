@@ -8,6 +8,7 @@
 # Source: https://www.gov.uk/government/statistical-data-sets/museums-and-galleries-monthly-visits
 
 library(dplyr)
+library(tidyr)
 library(scales)
 options(scipen = 999)
 
@@ -134,24 +135,27 @@ geom_line(size = 1.2) +                    # thicker lines
   geom_point(size = 1.5, alpha = 0.7) +     # optional points
   scale_y_continuous(labels = scales::comma) +      # format y-axis with commas
   scale_x_date(date_breaks = "6 months", date_labels = "%b %Y") +  # nice x-axis
-  geom_vline(xintercept = as.Date("2020-03-23"), linetype = "dashed", color = "#1C1C1C", size = .5) +
+  geom_vline(xintercept = as.Date("2019-07-01"), linetype = "dashed", color = "#4C4E52", size = .5) +
+  annotate("text", x = as.Date("2019-07-01"), y = max(uk_long$Visits)*0.25, 
+           label = "Summer Tourism Peak", color = "#4C4E52", angle = 90, vjust = -0.5, hjust = .25)+
+  geom_vline(xintercept = as.Date("2020-03-23"), linetype = "dashed", color = "#4C4E52", size = .5) +
   annotate("text", x = as.Date("2020-03-23"), y = max(uk_long$Visits)*0.99, 
-           label = "1st COVID Lockdown", color = "#1C1C1C", angle = 90, vjust = -0.5, hjust = 1) +
-  geom_vline(xintercept = as.Date("2020-11-05"), linetype = "dashed", color = "#1C1C1C", size = .5) +
+           label = "1st COVID Lockdown", color = "#4C4E52", angle = 90, vjust = -0.5, hjust = 1) +
+  geom_vline(xintercept = as.Date("2020-11-05"), linetype = "dashed", color = "#4C4E52", size = .5) +
   annotate("text", x = as.Date("2020-11-05"), y = max(uk_long$Visits)*0.99, 
-           label = "2nd COVID Lockdown", color = "#1C1C1C", angle = 90, vjust = -0.5, hjust = 1) +
-  geom_vline(xintercept = as.Date("2021-01-04"), linetype = "dashed", color = "#1C1C1C", size = .5) +
+           label = "2nd COVID Lockdown", color = "#4C4E52", angle = 90, vjust = -0.5, hjust = 1) +
+  geom_vline(xintercept = as.Date("2021-01-04"), linetype = "dashed", color = "#4C4E52", size = .5) +
   annotate("text", x = as.Date("2021-01-04"), y = max(uk_long$Visits)*0.99, 
-           label = "3rd COVID Lockdown", color = "#1C1C1C", angle = 90, vjust = -0.5, hjust = 1) +
-  geom_vline(xintercept = as.Date("2023-07-01"), linetype = "dashed", color = "#1C1C1C", size = .5) +
+           label = "3rd COVID Lockdown", color = "#4C4E52", angle = 90, vjust = -0.5, hjust = 1) +
+  geom_vline(xintercept = as.Date("2023-07-01"), linetype = "dashed", color = "#4C4E52", size = .5) +
   annotate("text", x = as.Date("2023-07-01"), y = max(uk_long$Visits)*0.25, 
-           label = "Summer Tourism Peak", color = "#1C1C1C", angle = 90, vjust = -0.5, hjust = .25) +
-  geom_vline(xintercept = as.Date("2024-07-01"), linetype = "dashed", color = "#1C1C1C", size = .5) +
+           label = "Summer Tourism Peak", color = "#4C4E52", angle = 90, vjust = -0.5, hjust = .25) +
+  geom_vline(xintercept = as.Date("2024-07-01"), linetype = "dashed", color = "#4C4E52", size = .5) +
   annotate("text", x = as.Date("2024-07-01"), y = max(uk_long$Visits)*0.25, 
-           label = "Summer Tourism Peak", color = "#1C1C1C", angle = 90, vjust = -0.5, hjust = .25) +
-  geom_vline(xintercept = as.Date("2025-07-01"), linetype = "dashed", color = "#1C1C1C", size = .5) +
+           label = "Summer Tourism Peak", color = "#4C4E52", angle = 90, vjust = -0.5, hjust = .25) +
+  geom_vline(xintercept = as.Date("2025-07-01"), linetype = "dashed", color = "#4C4E52", size = .5) +
   annotate("text", x = as.Date("2025-07-01"), y = max(uk_long$Visits)*0.25, 
-           label = "Summer Tourism Pea", color = "#1C1C1C", angle = 90, vjust = -0.5, hjust = .25)+
+           label = "Summer Tourism Peak", color = "#4C4E52", angle = 90, vjust = -0.5, hjust = .25)+
   labs(
     title = "Monthly Visits to The British Museum",
     subtitle = "January 2019 to September 2025",
@@ -169,3 +173,6 @@ geom_line(size = 1.2) +                    # thicker lines
     legend.title = element_blank() 
   )
 
+bm_visits_annot
+
+View(bm)
