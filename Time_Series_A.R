@@ -39,4 +39,7 @@ dt.ts %>%  autoplot(Vehicles) +
   autolayer(ma.trend, .vars = ma_veh, colour = "blue") +
   theme_minimal()
 
-
+lm.trend <- dt.ts %>% 
+  model(lin.trend = TSML(Vehicles ~ as.numeric(date)),
+        quad.trend = TLSM(Vehicles~as.numeric(date) 
+                          + I(as.numeric(date)^2)))
