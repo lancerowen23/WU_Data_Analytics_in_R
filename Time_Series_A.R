@@ -36,5 +36,7 @@ ma.trend <- dt.ts %>%
   mutate(ma_veh = ma(Vehicles, n = 7))
 
 dt.ts %>%  autoplot(Vehicles) +
-  autolayer(ma.trend, .vars = ) +
+  autolayer(ma.trend, .vars = ma_veh, colour = "blue") +
   theme_minimal()
+
+
