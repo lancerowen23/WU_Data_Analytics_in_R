@@ -79,7 +79,6 @@ dt.ts %>% autoplot(Vehicles) +
   autolayer(ma.trend, .vars = ma, colour = "red") +
   theme_minimal()
 
-
 ## estimate linear and quadratic trend 
 
 tslm.trend = dt.ts %>% model(
@@ -276,17 +275,17 @@ pred.holt = mod.refit %>% select(holt_wint) %>%
 
 
 pred.holt %>%
-  autoplot(level = 95) + theme_minimal()
+  autoplot(level = 60) + theme_minimal()
 
 
 ## adding exogenous variables 
 
-dt.weather = read.csv(paste0(data.dir, "weather_forecast.csv"))
+dt.weather = read.csv('~/Desktop/WU_Data_Analytics_in_R/weather_forecast.csv')
 
 head(dt.weather)
 
 dt.weather = dt.weather %>%
-  mutate(date = as.Date(date, format = "%m/%d/%y"), 
+  mutate(date = as.Date(date, format = "%m/%d/%Y"), 
          weather.for = as.factor(weather.for))
 
 dt.ts.full = full_join(dt.ts, dt.weather, by = c("date", "Junction"))
